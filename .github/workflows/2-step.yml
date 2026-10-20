@@ -16,7 +16,37 @@ env:
 jobs:
   find_exercise:
     name: Find Exercise Issue
-    uses: skills/exercise-toolkit/.github/workflows/find-exercise-issue.yml@v0.7.0
+    runs-on: ubuntu-latest
+    outputs:
+      issue-url: ${{ steps.find-exercise-issue.outputs.ISSUE_URL }}
+      issue-number: ${{ steps.find-exercise-issue.outputs.ISSUE_NUMBER }}
+    steps:
+      - id: find-exercise-issue
+        uses: actions/github-script@v9
+        env:
+          ISSUE_TITLE_PREFIX: Exercise
+        with:
+          retries: 3
+          script: |
+            const response = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              sort: 'created',
+              direction: 'desc',
+              per_page: 50
+            });
+
+            const issues = response.data.filter(item => !item.pull_request);
+            const issue = issues.find(issue => issue.title.includes(process.env.ISSUE_TITLE_PREFIX));
+
+            if (!issue) {
+              throw new Error('No exercise issue found');
+            }
+
+            core.info(`Exercise issue found: #${issue.number} (${issue.html_url})`);
+            core.setOutput('ISSUE_URL', issue.html_url);
+            core.setOutput('ISSUE_NUMBER', issue.number);
 
   check_step_work:
     name: Check step work
